@@ -14,7 +14,7 @@ Your goal is to create a csv file containing the following information:
     - 'Provider Organization Name (Legal Business Name)'
     - 'Provider Last Name (Legal Name)'
     - 'Provider First Name'
-    - 'Provider Middle Name'
+    - 'Provider Middle Name'     
     - 'Provider Name Prefix Text'
     - 'Provider Name Suffix Text'
     - 'Provider Credential Text'
