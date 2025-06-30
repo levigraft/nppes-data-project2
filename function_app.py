@@ -44,9 +44,14 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     # blob_client.download_blob().readinto(blob_stream)
     # blob_stream.seek(0)  # Reset stream position
 
-    blob_data = io.BytesIO(blob_client.download_blob().readall())
+    # blob_properties = blob_client.get_blob_properties()
+    # blob_size = blob_properties.size
+    # chunk_size_bytes = chunk_size_mb * 1024 * 1024
+
+    blob_data = io.BytesIO(blob_client.download_blob(offset=0,length=1024*1024).readall())
 
     df = pl.read_csv(blob_data, infer_schema=False)
+    
 
     switch_columns=[col for col in df.columns if "Taxonomy Switch_" in col]
     code_columns=[col for col in df.columns if "Taxonomy Code_" in col]
@@ -70,11 +75,9 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     
     df.write_database(
         table_name="temp_table",
-        connection="postgresql://admin:postgres@localhost:5432/project-2",
+        connection="postgresql://admin:password@localhost:5432/project-2",
         if_table_exists="replace"
     )
-
-    logging.info('Python HTTP trigger function processed a request.')
 
     end_time = datetime.now()
 
