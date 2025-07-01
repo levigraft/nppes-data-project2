@@ -4,8 +4,8 @@ from datetime import datetime
 from azure.storage.blob import BlobServiceClient
 import os
 import io
-import pandas as pd
 import polars as pl
+import psycopg2
 
 
 
@@ -37,7 +37,8 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     blob_service_client = BlobServiceClient.from_connection_string(STORAGE_CONNECTION_STRING)
     blob_client = blob_service_client.get_blob_client(
         container='project-2',
-        blob='npidata_pfile_20050523-20250413.csv'
+        blob='nppes_raw.parquet'
+        # blob='npidata_pfile_20050523-20250413.csv'
     )
 
     # blob_stream = io.BytesIO()
@@ -48,11 +49,12 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     # blob_size = blob_properties.size
     # chunk_size_bytes = chunk_size_mb * 1024 * 1024
 
-    blob_data = io.BytesIO(blob_client.download_blob(offset=0,length=1024*1024).readall())
+    blob = blob_client.download_blob()
+    blob_stream = io.BytesIO(blob.readall())
+    # blob_data = blob_client.download_blob(offset=0,length=1024*1024).readall().decode("utf-8")
 
-    df = pl.read_csv(blob_data, infer_schema=False)
+    df = pl.read_parquet(blob_stream)
     
-
     switch_columns=[col for col in df.columns if "Taxonomy Switch_" in col]
     code_columns=[col for col in df.columns if "Taxonomy Code_" in col]
     
@@ -73,11 +75,27 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
         *switch_columns,
         *code_columns]]
     
-    df.write_database(
-        table_name="temp_table",
-        connection="postgresql://admin:password@localhost:5432/project-2",
-        if_table_exists="replace"
-    )
+    # df.write_database(
+    #     table_name="temp_table",
+    #     connection="postgresql://admin:password@localhost:5432/project-2",
+    #     if_table_exists="replace"
+    # )
+
+    with psycopg2.connect(
+        dbname="project-2",
+        user="admin",
+        password="password",
+        host="localhost",
+        port="5432"
+    ) as conn:
+        with conn.cursor() as cursor:
+            df_as_csv = df.write_csv()
+            cursor.copy_expert(
+                f"COPY temp_table FROM STDIN WITH (FORMAT CSV, HEADER TRUE)",
+                io.StringIO(df_as_csv)
+            )
+
+            conn.commit()
 
     end_time = datetime.now()
 
