@@ -41,17 +41,8 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
         # blob='npidata_pfile_20050523-20250413.csv'
     )
 
-    # blob_stream = io.BytesIO()
-    # blob_client.download_blob().readinto(blob_stream)
-    # blob_stream.seek(0)  # Reset stream position
-
-    # blob_properties = blob_client.get_blob_properties()
-    # blob_size = blob_properties.size
-    # chunk_size_bytes = chunk_size_mb * 1024 * 1024
-
     blob = blob_client.download_blob()
     blob_stream = io.BytesIO(blob.readall())
-    # blob_data = blob_client.download_blob(offset=0,length=1024*1024).readall().decode("utf-8")
 
     df = pl.read_parquet(blob_stream)
     
@@ -74,12 +65,13 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
         'Provider Business Practice Location Address Postal Code',
         *switch_columns,
         *code_columns]]
-    
-    # df.write_database(
-    #     table_name="temp_table",
-    #     connection="postgresql://admin:password@localhost:5432/project-2",
-    #     if_table_exists="replace"
-    # )
+
+    RAW_DATA_TABLE = 'staging_raw'
+    CLEAN_DATA_PROC = 'clean_data'
+    COMPILE_DATA_PROC = 'compile_data'
+    STORE_DATA_PROC = 'store_data'
+    BATCH_SIZE = 10000
+    COMMIT_SIZE = 1000027
 
     with psycopg2.connect(
         dbname="project-2",
@@ -89,13 +81,32 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
         port="5432"
     ) as conn:
         with conn.cursor() as cursor:
-            df_as_csv = df.write_csv()
+            df_as_csv = df[:COMMIT_SIZE].write_csv()
+            ROW_COUNT = df[:COMMIT_SIZE].shape[0]
+            cursor.execute(f'TRUNCATE TABLE {RAW_DATA_TABLE};')
+
             cursor.copy_expert(
-                f"COPY temp_table FROM STDIN WITH (FORMAT CSV, HEADER TRUE)",
+                f"COPY {RAW_DATA_TABLE} FROM STDIN WITH (FORMAT CSV, HEADER TRUE)",
                 io.StringIO(df_as_csv)
             )
 
             conn.commit()
+
+            offset = 0
+            batch_counter = []
+            while offset < ROW_COUNT:
+                batch_start = datetime.now()
+
+                cursor.execute(f'CALL {CLEAN_DATA_PROC}({BATCH_SIZE}, {offset});')
+                cursor.execute(f'CALL {COMPILE_DATA_PROC}();')
+                cursor.execute(f'CALL {STORE_DATA_PROC}();')
+
+                conn.commit()
+
+                batch_end = datetime.now()
+                batch_counter.append(round((batch_end - batch_start).total_seconds() * 1000))
+
+                offset += BATCH_SIZE
 
     end_time = datetime.now()
 
@@ -104,6 +115,6 @@ def http_trigger(req: func.HttpRequest) -> func.HttpResponse:
     print(f"START: {start_time}; END: {end_time};  ELAPSED: {elapsed} ms")
    
     return func.HttpResponse(
-            f"Connection successful. Elapsed time: {elapsed} ms",
+            f"Connection successful. Elapsed time: {elapsed} ms. Batch times: {batch_counter}. Average batch time: {sum(batch_counter) / len(batch_counter)} ms.",
             status_code=200
     )
