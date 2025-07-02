@@ -1,4 +1,5 @@
-CREATE TABLE IF NOT EXISTS temp_table (
+--Populated via python
+CREATE TABLE IF NOT EXISTS staging_raw (
 	npi VARCHAR,
   entity_type_code VARCHAR,
 	provider_organization_name VARCHAR,
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS temp_table (
 	taxonomy_code_15 VARCHAR
 );
 
+--Import directly from CSV
 CREATE TABLE IF NOT EXISTS nucc_taxonomy_250 (
 	code VARCHAR PRIMARY KEY,
 	grouping VARCHAR,
@@ -56,8 +58,30 @@ CREATE TABLE IF NOT EXISTS nucc_taxonomy_250 (
 	section VARCHAR
 );
 
-CREATE TABLE IF NOT EXISTS nppes_cleaned (
-	npi VARCHAR PRIMARY KEY,
+--clean_data() - Stored proc (in batches) with case statement to select taxonomy code
+CREATE TABLE nppes_cleaned(
+	npi INT PRIMARY KEY,
+	entity_type_code VARCHAR,
+	provider_organization_name VARCHAR,
+	provider_last_name VARCHAR,
+	provider_first_name VARCHAR,
+	provider_middle_name VARCHAR,
+	provider_name_prefix VARCHAR,
+	provider_name_suffix VARCHAR,
+	provider_credentials VARCHAR,
+	provider_first_line_location_address VARCHAR,
+	provider_second_line_location_address VARCHAR,
+	provider_location_address_city_name VARCHAR,
+	provider_location_address_state_name VARCHAR,
+	provider_location_address_postal_code VARCHAR,
+	taxonomy_code VARCHAR NULL REFERENCES nucc_taxonomy_250 (code)
+);
+
+CREATE INDEX code_idx ON nppes_cleaned (taxonomy_code);
+
+--compile_data() - Populated via stored proc to join raw_with_single_code to nucc_taxonomy_250
+CREATE TABLE nppes_compiled(
+	npi INT PRIMARY KEY,
 	entity_type_code VARCHAR,
 	provider_organization_name VARCHAR,
 	provider_last_name VARCHAR,
@@ -77,62 +101,26 @@ CREATE TABLE IF NOT EXISTS nppes_cleaned (
 	specialization VARCHAR
 );
 
-CREATE UNIQUE INDEX npi_idx ON nppes_cleaned (npi);
-
--- CREATE VIEW merge_from AS
--- 	WITH filtered_tax_codes AS (
--- 		SELECT
--- 			npi,
--- 			entity_type_code,
--- 			provider_organization_name,
--- 			provider_last_name,
--- 			provider_first_name,
--- 			provider_middle_name,
--- 			provider_name_prefix,
--- 			provider_name_suffix,
--- 			provider_credentials,
--- 			provider_first_line_location_address,
--- 			provider_second_line_location_address,
--- 			provider_location_address_city_name,
--- 			provider_location_address_state_name,
--- 			provider_location_address_postal_code,
--- 			CASE WHEN taxonomy_switch_1 = 'Y' THEN taxonomy_code_1
--- 				WHEN taxonomy_switch_2 = 'Y' THEN taxonomy_code_2
--- 				WHEN taxonomy_switch_3 = 'Y' THEN taxonomy_code_3
--- 				WHEN taxonomy_switch_4 = 'Y' THEN taxonomy_code_4
--- 				WHEN taxonomy_switch_5 = 'Y' THEN taxonomy_code_5
--- 				WHEN taxonomy_switch_6 = 'Y' THEN taxonomy_code_6
--- 				WHEN taxonomy_switch_7 = 'Y' THEN taxonomy_code_7
--- 				WHEN taxonomy_switch_8 = 'Y' THEN taxonomy_code_8
--- 				WHEN taxonomy_switch_9 = 'Y' THEN taxonomy_code_9
--- 				WHEN taxonomy_switch_10 = 'Y' THEN taxonomy_code_10
--- 				WHEN taxonomy_switch_11 = 'Y' THEN taxonomy_code_11
--- 				WHEN taxonomy_switch_12 = 'Y' THEN taxonomy_code_12
--- 				WHEN taxonomy_switch_13 = 'Y' THEN taxonomy_code_13
--- 				WHEN taxonomy_switch_14 = 'Y' THEN taxonomy_code_14
--- 				WHEN taxonomy_switch_15 = 'Y' THEN taxonomy_code_15
--- 				ELSE null END AS taxonomy_code
--- 		FROM temp_table
--- 	)
--- 	SELECT 
--- 		ftc.npi,
--- 		ftc.entity_type_code,
--- 		ftc.provider_organization_name,
--- 		ftc.provider_last_name,
--- 		ftc.provider_first_name,
--- 		ftc.provider_middle_name,
--- 		ftc.provider_name_prefix,
--- 		ftc.provider_name_suffix,
--- 		ftc.provider_credentials,
--- 		ftc.provider_first_line_location_address,
--- 		ftc.provider_second_line_location_address,
--- 		ftc.provider_location_address_city_name,
--- 		ftc.provider_location_address_state_name,
--- 		ftc.provider_location_address_postal_code,
--- 		ftc.taxonomy_code,
--- 		codes.grouping,
--- 		codes.classification,
--- 		codes.specialization
--- 	FROM filtered_tax_codes ftc
--- 	LEFT JOIN nucc_taxonomy_250 codes
--- 	ON ftc.taxonomy_code = codes.code;
+--Stored proc to merge cleaned data into final database
+CREATE TABLE IF NOT EXISTS nppes_final (
+	npi INT PRIMARY KEY,
+	entity_type_code VARCHAR,
+	provider_organization_name VARCHAR,
+	provider_last_name VARCHAR,
+	provider_first_name VARCHAR,
+	provider_middle_name VARCHAR,
+	provider_name_prefix VARCHAR,
+	provider_name_suffix VARCHAR,
+	provider_credentials VARCHAR,
+	provider_first_line_location_address VARCHAR,
+	provider_second_line_location_address VARCHAR,
+	provider_location_address_city_name VARCHAR,
+	provider_location_address_state_name VARCHAR,
+	provider_location_address_postal_code VARCHAR,
+	taxonomy_code VARCHAR,
+	grouping VARCHAR,
+	classification VARCHAR,
+	specialization VARCHAR,
+	created TIMESTAMP,
+	last_modified TIMESTAMP
+);
