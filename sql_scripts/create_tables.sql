@@ -1,7 +1,7 @@
 --Populated via python
 CREATE TABLE IF NOT EXISTS staging_raw (
 	npi VARCHAR,
-  entity_type_code VARCHAR,
+  	entity_type_code VARCHAR,
 	provider_organization_name VARCHAR,
 	provider_last_name VARCHAR,
 	provider_first_name VARCHAR,
@@ -58,6 +58,20 @@ CREATE TABLE IF NOT EXISTS nucc_taxonomy_250 (
 	section VARCHAR
 );
 
+CREATE TABLE zip_code_data (
+	zip_code VARCHAR,
+	fips_code VARCHAR,
+	city VARCHAR,
+	state VARCHAR
+);
+
+CREATE TABLE county_population (
+	fips_code VARCHAR PRIMARY KEY,
+	population INT,
+	county VARCHAR,
+	state VARCHAR
+);
+
 --clean_data() - Stored proc (in batches) with case statement to select taxonomy code
 CREATE TABLE nppes_cleaned(
 	npi INT PRIMARY KEY,
@@ -94,6 +108,7 @@ CREATE TABLE nppes_compiled(
 	provider_second_line_location_address VARCHAR,
 	provider_location_address_city_name VARCHAR,
 	provider_location_address_state_name VARCHAR,
+	provider_location_address_county_name VARCHAR,
 	provider_location_address_postal_code VARCHAR,
 	taxonomy_code VARCHAR,
 	grouping VARCHAR,
@@ -116,6 +131,7 @@ CREATE TABLE IF NOT EXISTS nppes_final (
 	provider_second_line_location_address VARCHAR,
 	provider_location_address_city_name VARCHAR,
 	provider_location_address_state_name VARCHAR,
+	provider_location_address_county_name VARCHAR,
 	provider_location_address_postal_code VARCHAR,
 	taxonomy_code VARCHAR,
 	grouping VARCHAR,

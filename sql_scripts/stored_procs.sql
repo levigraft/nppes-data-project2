@@ -19,7 +19,7 @@ BEGIN
 		provider_second_line_location_address,
 		provider_location_address_city_name,
 		provider_location_address_state_name,
-		provider_location_address_postal_code,
+		LEFT(provider_location_address_postal_code, 5),
 		CASE WHEN taxonomy_switch_1 = 'Y' THEN taxonomy_code_1
 			WHEN taxonomy_switch_2 = 'Y' THEN taxonomy_code_2
 			WHEN taxonomy_switch_3 = 'Y' THEN taxonomy_code_3
@@ -61,6 +61,7 @@ BEGIN
 		clean.provider_second_line_location_address,
 		clean.provider_location_address_city_name,
 		clean.provider_location_address_state_name,
+		cty.county,
 		clean.provider_location_address_postal_code,
 		clean.taxonomy_code,
 		codes.grouping,
@@ -68,7 +69,23 @@ BEGIN
 		codes.specialization
 	FROM nppes_cleaned clean
 	LEFT JOIN nucc_taxonomy_250 codes
-	ON clean.taxonomy_code = codes.code;
+	ON clean.taxonomy_code = codes.code
+	LEFT JOIN (
+		WITH pop_ranks AS (
+			SELECT 
+				zip.zip_code,
+				pop.county,
+				pop.population,
+				RANK() OVER (PARTITION BY zip.zip_code ORDER BY pop.population DESC) AS pop_rank
+			FROM county_population pop
+			JOIN zip_code_data zip
+			ON pop.fips_code = zip.fips_code)
+		SELECT
+			zip_code,
+			county
+		FROM pop_ranks
+		WHERE pop_rank = 1) cty
+	ON clean.provider_location_address_postal_code = cty.zip_code;
 END;
 $$;
 
@@ -92,6 +109,7 @@ BEGIN
 			provider_second_line_location_address = source.provider_second_line_location_address,
 			provider_location_address_city_name = source.provider_location_address_city_name,
 			provider_location_address_state_name = source.provider_location_address_state_name,
+			provider_location_address_county_name = source.provider_location_address_county_name,
 			provider_location_address_postal_code = source.provider_location_address_postal_code,
 			taxonomy_code = source.taxonomy_code,
 			grouping = source.grouping,
@@ -113,6 +131,7 @@ BEGIN
 			provider_second_line_location_address,
 			provider_location_address_city_name,
 			provider_location_address_state_name,
+			provider_location_address_county_name,
 			provider_location_address_postal_code,
 			taxonomy_code,
 			grouping,
@@ -135,6 +154,7 @@ BEGIN
 			source.provider_second_line_location_address,
 			source.provider_location_address_city_name,
 			source.provider_location_address_state_name,
+			source.provider_location_address_county_name,
 			source.provider_location_address_postal_code,
 			source.taxonomy_code,
 			source.grouping,
