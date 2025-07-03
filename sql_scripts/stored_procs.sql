@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE clean_data(IN batch_limit INT, IN batch_offset INT)
+CREATE OR REPLACE PROCEDURE clean_data()
 LANGUAGE plpgsql
 AS $$
 BEGIN
@@ -36,10 +36,7 @@ BEGIN
 			WHEN taxonomy_switch_14 = 'Y' THEN taxonomy_code_14
 			WHEN taxonomy_switch_15 = 'Y' THEN taxonomy_code_15
 			ELSE NULL END AS taxonomy_code
-	FROM staging_raw
-	ORDER BY npi
-	LIMIT batch_limit
-	OFFSET batch_offset;
+	FROM staging_raw;
 END;
 $$;
 
