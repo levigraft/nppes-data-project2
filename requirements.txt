@@ -8,4 +8,5 @@ sqlalchemy
 psycopg2-binary
 pandas
 polars
-pyarrow>=8.0.0 
+pyarrow>=8.0.0
+openpyxl
