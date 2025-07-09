@@ -10,3 +10,4 @@ pandas
 polars
 pyarrow>=8.0.0
 openpyxl
+black
