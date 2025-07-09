@@ -26,5 +26,5 @@ jobs:
 
     - name: Check code formatting
       run: |
-        black 
+        black function_app.py
     
